@@ -30,6 +30,18 @@ app = Flask(__name__)
 # Model saved with Keras model.save()
 MODEL_PATH = 'models/cifar.h5'
 
+config = tf.ConfigProto(
+    device_count={'GPU': 1},
+    intra_op_parallelism_threads=1,
+    allow_soft_placement=True
+)
+
+config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction = 0.6
+
+session = tf.Session(config=config)
+K.set_session(session)
+
 # Load your trained model
 model = load_model(MODEL_PATH)
 model._make_predict_function()          # Necessary
@@ -51,18 +63,25 @@ print('Model loaded. Check http://127.0.0.1:5000/')
 #     final = pd.DataFrame({'name' : np.array(class_names),'probability' :preds[0]})
 #     return final.sort_values(by = 'probability',ascending=False),class_names[classification]
 def model_predict(img_path, model):
-    img = image.load_img(img_path, target_size=(32, 32,3))
-    # Preprocessing the image
-#     x = image.img_to_array(img)
-    # x = np.true_divide(x, 255)
-    x = np.expand_dims(img, axis=0)
 
-    # Be careful how your trained model deals with the input
-    # otherwise, it won't make correct prediction!
-#     x = preprocess_input(x, mode='caffe')
+    try:
+        with session.as_default():
+            with session.graph.as_default():
+                img = image.load_img(img_path, target_size=(32, 32,3))
+                # Preprocessing the image
+            #     x = image.img_to_array(img)
+                # x = np.true_divide(x, 255)
+                x = np.expand_dims(img, axis=0)
 
-    preds = model.predict(np.array(x))
-    return preds
+                # Be careful how your trained model deals with the input
+                # otherwise, it won't make correct prediction!
+            #     x = preprocess_input(x, mode='caffe')
+
+                preds = model.predict(np.array(x))
+                return preds
+    except Exception as ex:
+        log.log('Seatbelt Prediction Error', ex, ex.__traceback__.tb_lineno)
+    
 
 
 @app.route('/', methods=['GET'])
